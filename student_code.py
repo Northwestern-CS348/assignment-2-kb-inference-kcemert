@@ -128,6 +128,63 @@ class KnowledgeBase(object):
         printv("Retracting {!r}", 0, verbose, [fact_or_rule])
         ####################################################
         # Student code goes here
+        if isinstance(fact_or_rule, Fact):
+            if fact_or_rule in self.facts:
+                fact_or_rule = self._get_fact(fact_or_rule)
+                self.remove_helper(fact_or_rule)
+            
+    def remove_helper(self, fact_or_rule):
+        
+        if fact_or_rule.supported_by:
+                if fact_or_rule.asserted:
+                    fact_or_rule.asserted = False
+                return
+
+        
+        if isinstance(fact_or_rule, Fact):      
+            
+            if fact_or_rule.supports_facts:
+                for dependent in fact_or_rule.supports_facts:
+                    if dependent.supported_by:
+                        for pair in dependent.supported_by:
+                            if pair[0] == fact_or_rule:
+                                dependent.supported_by.remove(pair)
+                    if not dependent.supported_by:
+                        self.remove_helper(dependent)
+                
+            if fact_or_rule.supports_rules:  
+                for dependent in fact_or_rule.supports_rules:
+                    if dependent.supported_by:
+                        for pair in dependent.supported_by:
+                            if pair[0] == fact_or_rule:
+                                dependent.supported_by.remove(pair)
+                    if not dependent.supported_by:
+                        self.remove_helper(dependent)
+                        
+            if not fact_or_rule.supported_by:                
+                self.facts.remove(fact_or_rule)
+        
+        if isinstance(fact_or_rule, Rule):
+            if fact_or_rule.supports_facts:
+                for dependent in fact_or_rule.supports_facts:
+                    if dependent.supported_by:
+                        for pair in dependent.supported_by:
+                            if pair[1] == fact_or_rule:
+                                dependent.supported_by.remove(pair)
+                    if not dependent.supported_by:
+                        self.remove_helper(dependent)
+                            
+            if fact_or_rule.supports_rules:              
+                for dependent in fact_or_rule.supports_rules:
+                    if dependent.supported_by:
+                        for pair in dependent.supported_by:
+                            if pair[1] == fact_or_rule:
+                                dependent.supported_by.remove(pair)
+                    if not dependent.supported_by:
+                        self.remove_helper(dependent)
+                        
+            if not fact_or_rule.supported_by:                
+                self.rules.remove(fact_or_rule)
         
 
 class InferenceEngine(object):
@@ -146,3 +203,29 @@ class InferenceEngine(object):
             [fact.statement, rule.lhs, rule.rhs])
         ####################################################
         # Student code goes here
+        binding = match(fact.statement, rule.lhs[0])
+        
+        support = [fact, rule]
+        if binding:
+            # infer new rule
+            if len(rule.lhs)>1:
+                #breakpoint()
+                new_lhs = []
+                for stmt in rule.lhs[1:]:
+                    new_lhs.append(instantiate(stmt, binding))
+                newrule_rhs = instantiate(rule.rhs, binding)
+                #newrule.supported_by = support
+                newrule = Rule([new_lhs, newrule_rhs], [support])
+                #kb.rules.append(newrule2)
+                kb.kb_add(newrule)
+                newrule = kb._get_rule(newrule)
+                rule.supports_rules.append(newrule)
+                fact.supports_rules.append(newrule)
+            # infer new fact
+            if len(rule.lhs) == 1:
+                newfact = Fact(instantiate(rule.rhs, binding),[support])
+                #kb.facts.append(newfact)
+                kb.kb_add(newfact)
+                newfact = kb._get_fact(newfact)
+                rule.supports_rules.append(newfact)
+                fact.supports_rules.append(newfact)
